@@ -87,3 +87,177 @@ ggplot(data = lobster_tidy, aes(sample = size_mm)) +
 
 ```
 
+
+
+Use "lubridate" to parse dates and times:
+
+First, need to make "date" a variable not a character
+> class(lobster_tidy$date)
+[1] "character"
+> lobster_date <- lobster_tidy %>%
++   mutate{
+I'm going to add a new column with 'mutate()', that contains my date as an actual date
+
+```{r}
+lobster_date <- lobster_tidy %>%
+  mutate(
+    date_new = lubridate::mdy(date)
+  )
+     
+```
+
+> View(lobster_date)
+> class(lobster_date$date_new)
+[1] "Date"
+
+
+Parse "date" column to get the differenct pieces (month, year) separated
+```{r}
+lobster_parse_date <- lobster_date %>%
+  mutate(
+    obs_month = lubridate::month(date_new, label = TRUE),
+    obs_year = lubridate::year(date_new)
+  )
+```
+
+label = TRUE to see month name (below shows that months are in order, this is how you view that)
+> class(lobster_parse_date$obs_month)
+[1] "ordered" "factor" 
+> levels(lobster_parse_date$obs_month)
+ [1] "Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec"
+
+obs_year = lubridate::year(date_new) creates a new column for year
+
+Count lobsters by different groupings... count function is great for categorical data if you want to get total numbers
+
+?count (this format gives you a description of the term)
+
+Let's say I want to count the number of lobsters by year and month
+
+```{r}
+lobster_ym <- lobster_parse_date %>%
+  count(obs_year, obs_month)
+
+lobster_ym
+
+```
+
+What about for each year and site?
+```{r}
+lobster_ym <- lobster_parse_date %>%
+  count(obs_year, obs_month)
+
+lobster_ysite <- lobster_parse_date %>%
+  count(obs_year, site)
+
+lobster_ysite
+
+```
+```{r}
+lobster_ym <- lobster_parse_date %>%
+  count(obs_year, obs_month)
+
+lobster_ysite <- lobster_parse_date %>%
+  count(obs_year, site)
+
+lobster_ysite
+
+lobster_site <- lobster_parse_date %>%
+  count(site)
+
+lobster_site
+
+```
+
+Count is only so good, what if you want summaries and means and observations? Use group_by
+
+```{r}
+lobster_ym <- lobster_parse_date %>%
+  count(obs_year, obs_month)
+
+lobster_ysite <- lobster_parse_date %>%
+  count(obs_year, site)
+
+lobster_ysite
+
+lobster_site <- lobster_parse_date %>%
+  count(site)
+
+lobster_site
+
+# group_by + summarize + n() (this makes a new chart!)
+lobster_summary <- lobster_parse_date %>%
+  group_by(site) %>%
+  summarize(
+    mean_size = mean(size_mm, na.rm = TRUE),
+    sd_size = sd(size_mm, na.rm = TRUE),
+    sample_n = n()
+  )
+
+```
+
+Confidence intervals and t-tests
+
+Use the "t-test()" function to find confidence intervals and perform t-tests
+
+We want to find the confidence interval for lobster sizes at Isla Vista beach
+
+```{r}
+
+ivee_lobster <- lobster_tidy %>%
+  filter(site == "IVEE") %>%
+  pull(size_mm)
+
+# pull() shows specific values (just a list)
+
+t.test(ivee_lobster)
+
+#t.test() is a one sample t-test
+# confidence int tells us something about the sampling distribution - where would we expect to samples to fall 95% of the time?
+# sample mean (even if you took a ton more samples), we expect the sample to fall within the confidence interval 95% of the time
+# not the probability that the true population will exist in this range, but that I would expect any sample I take to fall within this interval 95% of the time
+
+```
+
+Two-sample t-test:
+Is there a significant difference in mean lobster lengths between Naples Reef and Mohawk Reef?
+
+```{r}
+
+napl_sample <- lobster_tidy %>%
+  filter(site == "NAPL") %>%
+  pull(size_mm)
+
+
+mohk_sample <- lobster_tidy %>%
+  filter(site == "MOHK") %>%
+  pull(size_mm)
+
+# to use a two-way t-test, include both variables in t.test()
+mohk_napl_ttest <- t.test(napl_sample, mohk_sample)
+mohk_napl_ttest
+
+# p-value = almost at zero. there is only a x probability that I could have taken two samples from pops with the same mean, and found by random chance with means of that difference...?
+
+```
+
+Mean lobster size differed significantly between Mohawk and Naples reefs (t(`r mohk_napl_ttest$parameter`) = 19.849)
+
+You don't just want to type the degrees of freedom, you could make an error - you want to use "inline referencing," which is the blue above
+
+Maybe an easier way to run a two sample t-test...
+```{r}
+lobster_2sample <- lobster_tidy %>%
+  filter(site %in% c("NAPL","MOHK"))
+
+
+ttest_2 <- t.test(size_mm ~ site, data = lobster_2sample)
+ttest_2
+```
+
+Make a geom_tile heatmap
+
+```{r}
+ggplot(data = lobster_ysite, aes(x = obs_year, y = site)) +
+  geom_tile(aes(fill = n))
+```
